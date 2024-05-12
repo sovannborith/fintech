@@ -6,18 +6,23 @@ import {
   Platform,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import React, { useState } from "react";
 import { defaultStyles } from "@/constants/Styles";
 import Colors from "@/constants/Colors";
 import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSignIn } from "@clerk/clerk-expo";
 
 const Page = () => {
-  const [countryCode, setCountryCode] = useState("+855");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+
   const keyboardVerticalOffset = Platform.OS === "ios" ? 80 : 0;
   const router = useRouter();
+
+  const { signIn, setActive } = useSignIn();
 
   enum SignInType {
     Phone,
@@ -25,8 +30,30 @@ const Page = () => {
     Google,
     Facebook,
   }
-  const onLogin = async (type: SignInType) => {
-    if (type === SignInType.Phone) {
+  const onSignIn = async (type: SignInType) => {
+    if (type === SignInType.Email) {
+      try {
+        const completeSignIn = await signIn?.create({
+          identifier: emailAddress,
+          password,
+        });
+        // send the email.
+        // await completeSignIn?.prepareFirstFactor({
+        //   strategy: "email_code",
+        //   emailAddressId: emailAddress,
+        // });
+
+        // router.push({
+        //   pathname: "/verify?signin=true",
+        // });
+        await setActive!({ session: completeSignIn?.createdSessionId });
+        router.replace("/");
+      } catch (err: any) {
+        console.error("Error signing in: ", JSON.stringify(err, null, 2));
+        if (err.errors[0].code === "form_identifier_not_found") {
+          Alert.alert("Error", err.errors[0].message);
+        }
+      }
     }
   };
   return (
@@ -43,27 +70,32 @@ const Page = () => {
 
         <View style={styles.inputContainer}>
           <TextInput
-            style={styles.input}
-            placeholder="Country code"
+            style={[styles.input]}
+            placeholder="Email..."
             placeholderTextColor={Colors.gray}
-            value={countryCode}
+            keyboardType="email-address"
+            value={emailAddress}
+            onChangeText={(email) => setEmailAddress(email)}
           />
           <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="Mobile number"
-            keyboardType="numeric"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
+            style={[styles.input]}
+            placeholder="Password..."
+            placeholderTextColor={Colors.gray}
+            secureTextEntry={true}
+            value={password}
+            onChangeText={(password) => setPassword(password)}
           />
         </View>
 
         <TouchableOpacity
           style={[
             defaultStyles.pillButton,
-            phoneNumber !== "" ? styles.enabled : styles.disabled,
+            emailAddress !== "" || password !== "" || password.length < 8
+              ? styles.enabled
+              : styles.disabled,
             { marginBottom: 20 },
           ]}
-          onPress={() => onLogin(SignInType.Phone)}
+          onPress={() => onSignIn(SignInType.Email)}
         >
           <Text style={defaultStyles.buttonText}>Continue</Text>
         </TouchableOpacity>
@@ -84,26 +116,9 @@ const Page = () => {
             }}
           />
         </View>
-        <TouchableOpacity
-          onPress={() => onLogin(SignInType.Email)}
-          style={[
-            defaultStyles.pillButton,
-            {
-              flexDirection: "row",
-              gap: 16,
-              marginTop: 20,
-              backgroundColor: "#fff",
-            },
-          ]}
-        >
-          <Ionicons name="mail" size={24} color={"#000"} />
-          <Text style={[defaultStyles.buttonText, { color: "#000" }]}>
-            Continue with email{" "}
-          </Text>
-        </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => onLogin(SignInType.Google)}
+          onPress={() => onSignIn(SignInType.Google)}
           style={[
             defaultStyles.pillButton,
             {
@@ -121,7 +136,7 @@ const Page = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => onLogin(SignInType.Facebook)}
+          onPress={() => onSignIn(SignInType.Facebook)}
           style={[
             defaultStyles.pillButton,
             {
@@ -144,15 +159,20 @@ const Page = () => {
 
 const styles = StyleSheet.create({
   inputContainer: {
-    marginVertical: 40,
-    flexDirection: "row",
+    marginVertical: 20,
+    display: "flex",
+    flex: 1,
+    flexDirection: "column",
+    gap: 20,
   },
   input: {
     backgroundColor: Colors.lightGray,
-    padding: 20,
-    borderRadius: 16,
+    padding: 10,
+    borderRadius: 4,
     fontSize: 20,
     marginRight: 10,
+
+    height: 60,
   },
   enabled: {
     backgroundColor: Colors.primary,
